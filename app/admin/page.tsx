@@ -118,9 +118,12 @@ export default function AdminPage() {
   function resetForm() { setForm({ ...EMPTY_FORM, category_slug: categories[0]?.slug||'' }); setEditId(null); setShowForm(false) }
 
   async function handleSave() {
-    if (!form.name||!form.start_date||!form.end_date||!form.category_slug) return
+    const isViaje = form.category_slug === 'viaje'
+    const autoName = isViaje ? `${form.vendedor} - ${form.location}` : form.name
+    if (!autoName||!form.start_date||!form.end_date||!form.category_slug) return
+    if (isViaje && (!form.vendedor||!form.location)) return
     setSaving(true)
-    const payload = { type: form.category_slug, category_slug: form.category_slug, name: form.name, start_date: form.start_date, end_date: form.end_date, location: form.location, vendedor: form.vendedor, dictante: form.dictante||null }
+    const payload = { type: form.category_slug, category_slug: form.category_slug, name: autoName, start_date: form.start_date, end_date: form.end_date, location: form.location, vendedor: form.vendedor, dictante: form.dictante||null }
     if (editId) await supabase.from('cal_activities').update(payload).eq('id',editId)
     else await supabase.from('cal_activities').insert(payload)
     await fetchAll(); resetForm(); setSaving(false)
@@ -234,41 +237,71 @@ export default function AdminPage() {
                     ))}
                   </div>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
-                  <div style={{ gridColumn:'1 / -1' }}>
-                    <label style={lbl}>Nombre</label>
-                    <input value={form.name} onChange={e => setForm(f => ({ ...f, name:e.target.value }))} placeholder="Nombre de la actividad" style={inp} />
-                  </div>
-                  <div>
-                    <label style={lbl}>Fecha inicio</label>
-                    <input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date:e.target.value, end_date:f.end_date||e.target.value }))} style={inp} />
-                  </div>
-                  <div>
-                    <label style={lbl}>Fecha fin</label>
-                    <input type="date" value={form.end_date} min={form.start_date} onChange={e => setForm(f => ({ ...f, end_date:e.target.value }))} style={inp} />
-                  </div>
-                  <div style={{ gridColumn:'1 / -1' }}>
-                    <label style={lbl}>{form.category_slug==='viaje' ? 'Destino' : 'Lugar'}</label>
-                    <input value={form.location} onChange={e => setForm(f => ({ ...f, location:e.target.value }))} placeholder={form.category_slug==='viaje' ? 'ej: Mar del Plata' : 'ej: Hotel Intersur, Buenos Aires'} style={inp} />
-                  </div>
-                  <div>
-                    <label style={lbl}>Vendedor</label>
-                    <input value={form.vendedor} onChange={e => setForm(f => ({ ...f, vendedor:e.target.value }))} placeholder="Nombre del vendedor" style={inp} />
-                  </div>
-                  {form.category_slug!=='viaje' && (
-                    <div>
-                      <label style={lbl}>Dictante</label>
-                      <input value={form.dictante} onChange={e => setForm(f => ({ ...f, dictante:e.target.value }))} placeholder="Nombre del dictante" style={inp} />
-                    </div>
-                  )}
-                </div>
-                <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-                  <button onClick={resetForm} style={{ background:'transparent', border:'1px solid #e0e0e0', color:'#999', padding:'9px 18px', borderRadius:8, cursor:'pointer', fontSize:13 }}>Cancelar</button>
-                  <button onClick={handleSave} disabled={saving||!form.name||!form.start_date||!form.end_date||!form.category_slug}
-                    style={{ background:'#f15922', border:'none', color:'#fff', padding:'9px 22px', borderRadius:8, cursor:'pointer', fontSize:14, fontWeight:700, fontFamily:'Montserrat', opacity:(!form.name||!form.start_date||!form.end_date||!form.category_slug)?0.4:1 }}>
-                    {saving ? 'Guardando...' : editId ? 'Guardar' : 'Agregar'}
-                  </button>
-                </div>
+                {(() => {
+                  const isViajeForm = form.category_slug === 'viaje'
+                  const canSave = isViajeForm
+                    ? (!!form.vendedor && !!form.location && !!form.start_date && !!form.end_date)
+                    : (!!form.name && !!form.start_date && !!form.end_date)
+                  return (
+                    <>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+                        {/* Vendedor primero para viaje */}
+                        <div style={{ gridColumn: isViajeForm ? '1 / 2' : '1 / -1' }}>
+                          <label style={lbl}>Vendedor</label>
+                          <input value={form.vendedor} onChange={e => setForm(f => ({ ...f, vendedor:e.target.value }))} placeholder="Nombre del vendedor" style={inp} />
+                        </div>
+                        {/* Destino para viaje (al lado del vendedor) */}
+                        {isViajeForm && (
+                          <div>
+                            <label style={lbl}>Destino</label>
+                            <input value={form.location} onChange={e => setForm(f => ({ ...f, location:e.target.value }))} placeholder="ej: Mar del Plata" style={inp} />
+                          </div>
+                        )}
+                        {/* Nombre solo para no-viaje */}
+                        {!isViajeForm && (
+                          <div style={{ gridColumn:'1 / -1' }}>
+                            <label style={lbl}>Nombre</label>
+                            <input value={form.name} onChange={e => setForm(f => ({ ...f, name:e.target.value }))} placeholder="Nombre de la actividad" style={inp} />
+                          </div>
+                        )}
+                        <div>
+                          <label style={lbl}>Fecha inicio</label>
+                          <input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date:e.target.value, end_date:f.end_date||e.target.value }))} style={inp} />
+                        </div>
+                        <div>
+                          <label style={lbl}>Fecha fin</label>
+                          <input type="date" value={form.end_date} min={form.start_date} onChange={e => setForm(f => ({ ...f, end_date:e.target.value }))} style={inp} />
+                        </div>
+                        {/* Lugar solo para no-viaje */}
+                        {!isViajeForm && (
+                          <div style={{ gridColumn:'1 / -1' }}>
+                            <label style={lbl}>Lugar</label>
+                            <input value={form.location} onChange={e => setForm(f => ({ ...f, location:e.target.value }))} placeholder="ej: Hotel Intersur, Buenos Aires" style={inp} />
+                          </div>
+                        )}
+                        {!isViajeForm && (
+                          <div>
+                            <label style={lbl}>Dictante</label>
+                            <input value={form.dictante} onChange={e => setForm(f => ({ ...f, dictante:e.target.value }))} placeholder="Nombre del dictante" style={inp} />
+                          </div>
+                        )}
+                      </div>
+                      {/* Preview para viaje */}
+                      {isViajeForm && form.vendedor && form.location && (
+                        <div style={{ background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:8, padding:'8px 12px', marginBottom:12, fontSize:12, color:'#16a34a', fontFamily:'Barlow Condensed', letterSpacing:0.5 }}>
+                          ✈ Así va a aparecer: <strong>{form.vendedor} - {form.location}</strong>
+                        </div>
+                      )}
+                      <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+                        <button onClick={resetForm} style={{ background:'transparent', border:'1px solid #e0e0e0', color:'#999', padding:'9px 18px', borderRadius:8, cursor:'pointer', fontSize:13 }}>Cancelar</button>
+                        <button onClick={handleSave} disabled={saving || !canSave}
+                          style={{ background:'#f15922', border:'none', color:'#fff', padding:'9px 22px', borderRadius:8, cursor:'pointer', fontSize:14, fontWeight:700, fontFamily:'Montserrat', opacity: !canSave ? 0.4 : 1 }}>
+                          {saving ? 'Guardando...' : editId ? 'Guardar' : 'Agregar'}
+                        </button>
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             )}
 
