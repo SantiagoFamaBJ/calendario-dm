@@ -33,7 +33,11 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
   const catMap = Object.fromEntries(categories.map(c => [c.slug, c]))
 
   function getCat(act: Activity) {
-    return catMap[act.category_slug] || catMap[act.type] || { color: '#666', name: act.category_slug || act.type, slug: '' }
+    return catMap[act.category_slug] || catMap[act.type] || { color: '#888', name: act.category_slug || act.type, slug: '' }
+  }
+
+  function isViaje(act: Activity) {
+    return act.category_slug === 'viaje' || act.type === 'viaje'
   }
 
   const year = currentDate.getFullYear()
@@ -61,6 +65,10 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
     return activities
       .filter(a => isInRange(date, parseLocalDate(a.start_date), parseLocalDate(a.end_date)))
       .sort((a, b) => {
+        // Viajes siempre primero
+        const aV = isViaje(a) ? -1 : 0
+        const bV = isViaje(b) ? -1 : 0
+        if (aV !== bV) return aV - bV
         const ao = catOrder[a.category_slug] ?? catOrder[a.type] ?? 99
         const bo = catOrder[b.category_slug] ?? catOrder[b.type] ?? 99
         return ao - bo
@@ -72,12 +80,12 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
   return (
     <>
       {/* Day headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--bg2)', borderBottom: '1px solid var(--border)' }}>
         {DAY_HEADERS.map((d, i) => (
           <div key={d} style={{
             textAlign: 'center', fontSize: 10, fontFamily: 'Barlow Condensed', letterSpacing: 1.5,
             color: i >= 5 ? 'var(--text-dim)' : 'var(--text-muted)',
-            padding: '8px 0', fontWeight: 600, textTransform: 'uppercase',
+            padding: '8px 0', fontWeight: 700, textTransform: 'uppercase',
             borderRight: i < 6 ? '1px solid var(--border)' : 'none',
           }}>{d}</div>
         ))}
@@ -90,7 +98,6 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
             {week.map((date, di) => {
               const isToday = date ? isSameDay(date, today) : false
               const isWeekend = date ? (date.getDay() === 0 || date.getDay() === 6) : false
-              const isOtherMonth = !date
               const dayActivities = date ? getActivitiesForDay(date) : []
 
               return (
@@ -98,15 +105,14 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
                   borderRight: di < 6 ? '1px solid var(--border)' : 'none',
                   padding: '6px 0 4px',
                   minHeight: 110,
-                  background: isOtherMonth ? 'transparent' : isWeekend ? 'rgba(255,255,255,0.008)' : 'transparent',
-                  position: 'relative',
+                  background: isWeekend ? 'var(--bg2)' : 'var(--bg)',
                 }}>
                   {date && (
                     <>
                       <div style={{
                         width: 24, height: 24,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        margin: '0 auto 5px',
+                        margin: '0 auto 4px',
                         borderRadius: '50%',
                         background: isToday ? 'var(--orange)' : 'transparent',
                         fontSize: 12,
@@ -120,13 +126,18 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 2px' }}>
                         {dayActivities.map(act => {
                           const cat = getCat(act)
+                          const viaje = isViaje(act)
                           const start = parseLocalDate(act.start_date)
                           const end = parseLocalDate(act.end_date)
                           const isStart = isSameDay(start, date) || date.getDay() === 1
                           const isEnd = isSameDay(end, date) || date.getDay() === 0
                           const realStart = isSameDay(start, date)
                           const showLabel = realStart || date.getDay() === 1
-                          const isViaje = act.category_slug === 'viaje' || act.type === 'viaje'
+
+                          // Viaje label: ✈ vendedor — lugar
+                          const viajeLabel = viaje
+                            ? `✈ ${act.vendedor || act.name}${act.location ? ' — ' + act.location : ''}`
+                            : act.name
 
                           return (
                             <button
@@ -134,12 +145,12 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
                               onClick={() => setSelected(act)}
                               style={{
                                 display: 'block', width: '100%',
-                                background: `${cat.color}1a`,
+                                background: `${cat.color}15`,
                                 border: 'none',
-                                borderTop: `1.5px solid ${cat.color}`,
-                                borderBottom: `1.5px solid ${cat.color}`,
-                                borderLeft: isStart ? `1.5px solid ${cat.color}` : 'none',
-                                borderRight: isEnd ? `1.5px solid ${cat.color}` : 'none',
+                                borderTop: `2px solid ${cat.color}`,
+                                borderBottom: `2px solid ${cat.color}`,
+                                borderLeft: isStart ? `2px solid ${cat.color}` : 'none',
+                                borderRight: isEnd ? `2px solid ${cat.color}` : 'none',
                                 borderRadius: isStart && isEnd ? 5 : isStart ? '5px 0 0 5px' : isEnd ? '0 5px 5px 0' : 0,
                                 padding: '2px 5px',
                                 cursor: 'pointer',
@@ -149,12 +160,12 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
                                 minHeight: 20,
                                 transition: 'filter 0.1s',
                               }}
-                              onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.4)' }}
+                              onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(0.92)' }}
                               onMouseLeave={e => { e.currentTarget.style.filter = 'brightness(1)' }}
                             >
                               {showLabel && (
-                                <span style={{ fontSize: 10, fontFamily: 'Barlow Condensed', fontWeight: 600, color: cat.color, letterSpacing: 0.2, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {isViaje ? '✈ ' : ''}{act.name}
+                                <span style={{ fontSize: 10, fontFamily: 'Barlow Condensed', fontWeight: 700, color: cat.color, letterSpacing: 0.2, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {viajeLabel}
                                 </span>
                               )}
                             </button>
@@ -173,35 +184,34 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
       {/* Modal */}
       {selected && (() => {
         const cat = getCat(selected)
-        const isViaje = selected.category_slug === 'viaje' || selected.type === 'viaje'
+        const viaje = isViaje(selected)
         return (
-          <div onClick={() => setSelected(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-            <div onClick={e => e.stopPropagation()} style={{ background: '#131313', border: `1px solid ${cat.color}40`, borderRadius: 16, padding: 28, maxWidth: 400, width: '100%', position: 'relative', boxShadow: `0 0 40px ${cat.color}20` }}>
-              {/* Badge */}
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${cat.color}18`, border: `1px solid ${cat.color}50`, borderRadius: 20, padding: '4px 12px', marginBottom: 14 }}>
+          <div onClick={() => setSelected(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: '#fff', border: `1px solid ${cat.color}40`, borderRadius: 16, padding: 28, maxWidth: 400, width: '100%', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${cat.color}12`, border: `1px solid ${cat.color}40`, borderRadius: 20, padding: '4px 12px', marginBottom: 14 }}>
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: cat.color }} />
                 <span style={{ fontSize: 10, fontFamily: 'Barlow Condensed', fontWeight: 700, color: cat.color, letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                  {isViaje ? '✈ ' : ''}{cat.name}
+                  {viaje ? '✈ ' : ''}{cat.name}
                 </span>
               </div>
 
-              <h2 style={{ fontSize: 19, fontWeight: 800, fontFamily: 'Montserrat', color: '#f0f0f0', marginBottom: 20, lineHeight: 1.25 }}>{selected.name}</h2>
+              <h2 style={{ fontSize: 19, fontWeight: 800, fontFamily: 'Montserrat', color: '#111', marginBottom: 20, lineHeight: 1.25 }}>{selected.name}</h2>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {[
                   { label: 'Fechas', value: selected.start_date === selected.end_date ? formatDate(selected.start_date) : `${formatDate(selected.start_date)} → ${formatDate(selected.end_date)}` },
-                  { label: 'Lugar', value: selected.location || '—' },
+                  { label: viaje ? 'Destino' : 'Lugar', value: selected.location || '—' },
                   { label: 'Vendedor', value: selected.vendedor || '—' },
-                  ...(selected.dictante ? [{ label: 'Dictante', value: selected.dictante }] : []),
+                  ...(selected.dictante && !viaje ? [{ label: 'Dictante', value: selected.dictante }] : []),
                 ].map(({ label, value }) => (
                   <div key={label} style={{ display: 'flex', gap: 14 }}>
-                    <span style={{ fontSize: 10, fontFamily: 'Barlow Condensed', color: 'var(--text-muted)', letterSpacing: 1.5, textTransform: 'uppercase', minWidth: 60, paddingTop: 3, flexShrink: 0 }}>{label}</span>
-                    <span style={{ fontSize: 14, color: '#d0d0d0', fontFamily: 'Barlow', lineHeight: 1.4 }}>{value}</span>
+                    <span style={{ fontSize: 10, fontFamily: 'Barlow Condensed', color: '#aaa', letterSpacing: 1.5, textTransform: 'uppercase', minWidth: 60, paddingTop: 3, flexShrink: 0 }}>{label}</span>
+                    <span style={{ fontSize: 14, color: '#333', fontFamily: 'Barlow', lineHeight: 1.4 }}>{value}</span>
                   </div>
                 ))}
               </div>
 
-              <button onClick={() => setSelected(null)} style={{ position: 'absolute', top: 16, right: 16, background: '#1e1e1e', border: '1px solid #2a2a2a', color: '#666', width: 28, height: 28, borderRadius: 7, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+              <button onClick={() => setSelected(null)} style={{ position: 'absolute', top: 16, right: 16, background: '#f5f5f5', border: '1px solid #e8e8e8', color: '#999', width: 28, height: 28, borderRadius: 7, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
           </div>
         )

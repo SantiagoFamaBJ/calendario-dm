@@ -31,30 +31,29 @@ export default function Home() {
       <header style={{
         borderBottom: '1px solid var(--border)',
         padding: '0 24px',
-        height: 64,
+        height: 60,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         position: 'sticky',
         top: 0,
-        background: 'rgba(10,10,10,0.95)',
+        background: 'rgba(255,255,255,0.97)',
         backdropFilter: 'blur(12px)',
         zIndex: 50,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {/* Logo mark */}
-          <div style={{ width: 32, height: 32, background: 'var(--orange)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <span style={{ color: '#fff', fontSize: 14, fontWeight: 900, fontFamily: 'Montserrat' }}>DM</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 34, height: 34, background: 'var(--orange)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ color: '#fff', fontSize: 13, fontWeight: 900, fontFamily: 'Montserrat' }}>DM</span>
           </div>
           <div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'Barlow Condensed', letterSpacing: 2, textTransform: 'uppercase' }}>Dental Medrano</div>
-            <h1 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', fontFamily: 'Montserrat', textTransform: 'capitalize', lineHeight: 1 }}>
+            <div style={{ fontSize: 10, color: 'var(--orange)', fontFamily: 'Barlow Condensed', letterSpacing: 2, textTransform: 'uppercase', fontWeight: 600 }}>Dental Medrano</div>
+            <h1 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', fontFamily: 'Montserrat', textTransform: 'capitalize', lineHeight: 1.1 }}>
               Calendario {monthName} {year}
             </h1>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button onClick={() => setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
             style={{ background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--text)', width: 34, height: 34, borderRadius: 8, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
           <button onClick={() => setCurrentDate(new Date())}
@@ -66,9 +65,9 @@ export default function Home() {
 
       {/* Legend */}
       {categories.length > 0 && (
-        <div style={{ padding: '10px 24px', display: 'flex', gap: 14, flexWrap: 'wrap', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+        <div style={{ padding: '10px 24px', display: 'flex', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
           {categories.map(cat => (
-            <div key={cat.slug} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div key={cat.slug} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 8, height: 8, borderRadius: 2, background: cat.color, flexShrink: 0 }} />
               <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'Barlow Condensed', letterSpacing: 0.5 }}>{cat.name}</span>
             </div>
