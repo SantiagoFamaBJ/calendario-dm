@@ -321,16 +321,6 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
                 ))}
               </div>
 
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: 8, marginTop: 24, paddingTop: 20, borderTop: '1px solid #f0f0f0' }}>
-                <button
-                  onClick={() => { handleDuplicate(selected); setSelected(null) }}
-                  style={{ background: '#f5f5f5', border: '1px solid #e8e8e8', color: '#666', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontFamily: 'Barlow Condensed', letterSpacing: 0.5, display: 'flex', alignItems: 'center', gap: 6 }}
-                >
-                  ⧉ Duplicar
-                </button>
-              </div>
-
               <button onClick={() => setSelected(null)} style={{ position: 'absolute', top: 18, right: 18, background: '#f5f5f5', border: '1px solid #e8e8e8', color: '#aaa', width: 30, height: 30, borderRadius: 8, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
           </div>
