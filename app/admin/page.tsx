@@ -162,8 +162,24 @@ export default function AdminPage() {
     setCsvImporting(false); setCsvDone(true); await fetchAll()
   }
 
+  async function handleDuplicate(act: Activity) {
+    const { id, created_at, ...rest } = act as any
+    await supabase.from('cal_activities').insert({ ...rest, name: rest.name + ' (copia)' })
+    await fetchAll()
+  }
+
   const catMap = Object.fromEntries(categories.map(c => [c.slug,c]))
-  const filtered = filter === 'all' ? activities : activities.filter(a => (a.category_slug||a.type) === filter)
+  const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<'fecha' | 'categoria'>('fecha')
+
+  const filtered = activities
+    .filter(a => filter === 'all' || (a.category_slug||a.type) === filter)
+    .filter(a => !search || (a.vendedor||'').toLowerCase().includes(search.toLowerCase()) || (a.name||'').toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      if (sortBy === 'fecha') return a.start_date.localeCompare(b.start_date)
+      const catOrder = Object.fromEntries(categories.map((c, i) => [c.slug, i]))
+      return (catOrder[a.category_slug] ?? 99) - (catOrder[b.category_slug] ?? 99)
+    })
 
   const inp = { background:'#f7f7f7', border:'1px solid #e0e0e0', borderRadius:8, color:'#111', padding:'10px 12px', fontSize:14, fontFamily:'Barlow, sans-serif', width:'100%', outline:'none' }
   const lbl = { fontSize:10, fontFamily:'Barlow Condensed, sans-serif', letterSpacing:1.5, color:'#999', textTransform:'uppercase' as const, marginBottom:5, display:'block', fontWeight:600 }
@@ -305,6 +321,24 @@ export default function AdminPage() {
               </div>
             )}
 
+            {/* Search + sort */}
+            <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar por vendedor o nombre..."
+                style={{ background:'#fff', border:'1px solid #e0e0e0', borderRadius:8, color:'#111', padding:'7px 12px', fontSize:13, fontFamily:'Barlow, sans-serif', outline:'none', flex:1, minWidth:200 }}
+              />
+              <div style={{ display:'flex', gap:4 }}>
+                {(['fecha','categoria'] as const).map(s => (
+                  <button key={s} onClick={() => setSortBy(s)} style={{ background: sortBy===s ? '#111' : '#fff', border:`1px solid ${sortBy===s ? '#111' : '#e0e0e0'}`, color: sortBy===s ? '#fff' : '#888', padding:'7px 12px', borderRadius:8, cursor:'pointer', fontSize:11, fontFamily:'Barlow Condensed', letterSpacing:0.5, fontWeight:600, textTransform:'uppercase' }}>
+                    {s === 'fecha' ? '↑ Fecha' : '◆ Categoría'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Category filters */}
             <div style={{ display:'flex', gap:6, marginBottom:14, flexWrap:'wrap' }}>
               <button onClick={() => setFilter('all')} style={{ background: filter==='all' ? '#f15922' : '#fff', border:`1px solid ${filter==='all' ? '#f15922' : '#e0e0e0'}`, color: filter==='all' ? '#fff' : '#888', padding:'5px 14px', borderRadius:20, cursor:'pointer', fontSize:11, fontFamily:'Barlow Condensed', letterSpacing:0.5, fontWeight:600 }}>Todas</button>
               {categories.map(cat => (
@@ -334,6 +368,7 @@ export default function AdminPage() {
                       </div>
                       <div style={{ display:'flex', gap:5, flexShrink:0 }}>
                         <button onClick={() => startEdit(act)} style={{ background:'#f5f5f5', border:'1px solid #e8e8e8', color:'#888', width:30, height:30, borderRadius:6, cursor:'pointer', fontSize:12 }}>✏</button>
+                        <button onClick={() => handleDuplicate(act)} title="Duplicar" style={{ background:'#f5f5f5', border:'1px solid #e8e8e8', color:'#888', width:30, height:30, borderRadius:6, cursor:'pointer', fontSize:13 }}>⧉</button>
                         {deleteConfirm===act.id
                           ? <button onClick={() => handleDelete(act.id)} style={{ background:'#fef2f2', border:'1px solid #fecaca', color:'#ef4444', padding:'0 10px', height:30, borderRadius:6, cursor:'pointer', fontSize:11, fontFamily:'Barlow Condensed', fontWeight:700 }}>Borrar</button>
                           : <button onClick={() => setDeleteConfirm(act.id)} style={{ background:'#f5f5f5', border:'1px solid #e8e8e8', color:'#888', width:30, height:30, borderRadius:6, cursor:'pointer', fontSize:12 }}>🗑</button>
