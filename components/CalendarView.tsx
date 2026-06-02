@@ -123,32 +123,22 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
       <style>{`
         @keyframes stripe-move {
           0% { background-position: 0 0; }
-          100% { background-position: 28px 0; }
+          100% { background-position: 40px 40px; }
         }
         .viaje-bar {
           background-image: repeating-linear-gradient(
-            45deg,
+            -45deg,
             transparent,
-            transparent 6px,
-            rgba(255,255,255,0.18) 6px,
-            rgba(255,255,255,0.18) 12px
+            transparent 8px,
+            rgba(255,255,255,0.15) 8px,
+            rgba(255,255,255,0.15) 16px
           ) !important;
-          animation: stripe-move 2s linear infinite;
+          background-size: 40px 40px !important;
+          animation: stripe-move 3s linear infinite;
         }
         .cal-bar { transition: filter 0.12s, transform 0.12s; }
         .cal-bar:hover { filter: brightness(0.88) !important; transform: scaleY(1.08); }
       `}</style>
-
-      {/* Legend with counts */}
-      <div style={{ padding: '10px 20px', display: 'flex', gap: 14, flexWrap: 'wrap', borderBottom: '1px solid #e8e8e8', background: '#fafafa', alignItems: 'center' }}>
-        {monthCounts.map(cat => (
-          <div key={cat.slug} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: cat.color, flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: '#888', fontFamily: 'Barlow Condensed', letterSpacing: 0.5 }}>{cat.name}</span>
-            <span style={{ fontSize: 10, background: `${cat.color}18`, color: cat.color, borderRadius: 10, padding: '1px 6px', fontFamily: 'Barlow Condensed', fontWeight: 700 }}>{cat.count}</span>
-          </div>
-        ))}
-      </div>
 
       {/* Day headers */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#f5f5f5', borderBottom: '1px solid #e8e8e8' }}>
@@ -294,8 +284,8 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
           position: 'fixed',
           left: Math.min(tooltip.x + 12, window.innerWidth - 260),
           top: tooltip.y - 10,
-          background: '#111',
-          color: '#f0f0f0',
+          background: '#f0f0f0',
+          color: '#222',
           borderRadius: 10,
           padding: '10px 14px',
           fontSize: 12,
@@ -303,7 +293,7 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
           zIndex: 200,
           pointerEvents: 'none',
           maxWidth: 250,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
           border: `1px solid ${getCat(tooltip.act).color}40`,
         }}>
           <div style={{ fontWeight: 700, fontFamily: 'Montserrat', fontSize: 13, marginBottom: 4, color: getCat(tooltip.act).color }}>
