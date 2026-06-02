@@ -230,11 +230,11 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
           if (dayActs.length === 0 && !isToday) return null
           return (
             <div key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
-              <div style={{ padding: '10px 16px 6px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: isToday ? '#f15922' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: isToday ? '0 2px 8px rgba(241,89,34,0.3)' : 'none' }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: isToday ? '#fff' : isWeekend ? '#ccc' : '#aaa', fontFamily: 'Montserrat' }}>{date!.getDate()}</span>
+              <div style={{ padding: '12px 16px 6px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: isToday ? '#f15922' : isWeekend ? '#f5f5f5' : '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: isToday ? '0 2px 8px rgba(241,89,34,0.3)' : 'none' }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: isToday ? '#fff' : isWeekend ? '#bbb' : '#444', fontFamily: 'Montserrat' }}>{date!.getDate()}</span>
                 </div>
-                <span style={{ fontSize: 11, color: '#ccc', fontFamily: 'Barlow Condensed', letterSpacing: 1, textTransform: 'uppercase' }}>
+                <span style={{ fontSize: 12, color: isWeekend ? '#bbb' : '#888', fontFamily: 'Barlow Condensed', letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600 }}>
                   {date!.toLocaleDateString('es-AR', { weekday: 'long' })}
                 </span>
               </div>
