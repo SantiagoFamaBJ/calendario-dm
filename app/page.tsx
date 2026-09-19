@@ -52,13 +52,7 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
     const acts = activities.filter(a => {
       const s = parseLocalDate(a.start_date); const e = parseLocalDate(a.end_date)
       return s <= weekEnd && e >= weekStart
-    }).sort((a, b) => {
-      if (isViaje(a) && !isViaje(b)) return -1
-      if (!isViaje(a) && isViaje(b)) return 1
-      const ao = catOrder[a.category_slug] ?? 99; const bo = catOrder[b.category_slug] ?? 99
-      if (ao !== bo) return ao - bo
-      return parseLocalDate(a.start_date).getTime() - parseLocalDate(b.start_date).getTime()
-    })
+    }).sort((a, b) => parseLocalDate(a.start_date).getTime() - parseLocalDate(b.start_date).getTime())
     if (acts.length === 0) return
     const label = weekStart.getDate() === weekEnd.getDate()
       ? `${weekStart.getDate()}`
