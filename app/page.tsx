@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase, Activity, Category } from '@/lib/supabase'
 import CalendarView from '@/components/CalendarView'
+import PrintView from '@/components/PrintView'
 
 export default function Home() {
   const [activities, setActivities] = useState<Activity[]>([])
@@ -22,63 +23,82 @@ export default function Home() {
     setLoading(false)
   }
 
+  function handlePrint() {
+    window.print()
+  }
+
   const monthName = currentDate.toLocaleString('es-AR', { month: 'long' })
   const year = currentDate.getFullYear()
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: 60 }}>
-      {/* Header */}
-      <header style={{
-        borderBottom: '1px solid var(--border)',
-        padding: '0 24px',
-        height: 60,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        position: 'sticky',
-        top: 0,
-        background: 'rgba(255,255,255,0.97)',
-        backdropFilter: 'blur(12px)',
-        zIndex: 50,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 34, height: 34, background: 'var(--orange)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <span style={{ color: '#fff', fontSize: 13, fontWeight: 900, fontFamily: 'Montserrat' }}>DM</span>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: 'var(--orange)', fontFamily: 'Barlow Condensed', letterSpacing: 2, textTransform: 'uppercase', fontWeight: 600 }}>Dental Medrano</div>
-            <h1 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', fontFamily: 'Montserrat', textTransform: 'capitalize', lineHeight: 1.1 }}>
-              Calendario {monthName} {year}
-            </h1>
-          </div>
-        </div>
+    <>
+      {/* Print CSS */}
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 10mm; }
+          body * { visibility: hidden; }
+          #print-area, #print-area * { visibility: visible; }
+          #print-area { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        }
+        @media screen {
+          #print-area { display: none; }
+        }
+      `}</style>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button onClick={() => setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
-            style={{ background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--text)', width: 34, height: 34, borderRadius: 8, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
-          <button onClick={() => setCurrentDate(new Date())}
-            style={{ background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--text-muted)', height: 34, padding: '0 14px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontFamily: 'Barlow Condensed', letterSpacing: 1.5, textTransform: 'uppercase' }}>Hoy</button>
-          <button onClick={() => setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
-            style={{ background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--text)', width: 34, height: 34, borderRadius: 8, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
-        </div>
-      </header>
+      {/* Hidden print area */}
+      <div id="print-area">
+        <PrintView activities={activities} categories={categories} currentDate={currentDate} />
+      </div>
 
-      {/* Legend */}
-      {categories.length > 0 && (
-        <div style={{ padding: '10px 24px', display: 'flex', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
-          {categories.map(cat => (
-            <div key={cat.slug} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 8, height: 8, borderRadius: 2, background: cat.color, flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'Barlow Condensed', letterSpacing: 0.5 }}>{cat.name}</span>
+      {/* Normal screen view */}
+      <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: 60 }}>
+        <header style={{ borderBottom: '1px solid var(--border)', padding: '0 24px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(12px)', zIndex: 50 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 34, height: 34, background: 'var(--orange)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span style={{ color: '#fff', fontSize: 13, fontWeight: 900, fontFamily: 'Montserrat' }}>DM</span>
             </div>
-          ))}
-        </div>
-      )}
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--orange)', fontFamily: 'Barlow Condensed', letterSpacing: 2, textTransform: 'uppercase', fontWeight: 600 }}>Dental Medrano</div>
+              <h1 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', fontFamily: 'Montserrat', textTransform: 'capitalize', lineHeight: 1.1 }}>
+                Calendario {monthName} {year}
+              </h1>
+            </div>
+          </div>
 
-      {loading
-        ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--text-muted)', fontSize: 13, fontFamily: 'Barlow Condensed', letterSpacing: 1 }}>Cargando...</div>
-        : <CalendarView activities={activities} categories={categories} currentDate={currentDate} />
-      }
-    </main>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Print button */}
+            <button
+              onClick={handlePrint}
+              title="Imprimir en A4"
+              style={{ background: '#f5f5f5', border: '1px solid #e0e0e0', color: '#666', height: 34, padding: '0 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontFamily: 'Barlow Condensed', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              🖨 Imprimir
+            </button>
+            <button onClick={() => setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+              style={{ background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--text)', width: 34, height: 34, borderRadius: 8, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+            <button onClick={() => setCurrentDate(new Date())}
+              style={{ background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--text-muted)', height: 34, padding: '0 14px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontFamily: 'Barlow Condensed', letterSpacing: 1.5, textTransform: 'uppercase' }}>Hoy</button>
+            <button onClick={() => setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+              style={{ background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--text)', width: 34, height: 34, borderRadius: 8, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+          </div>
+        </header>
+
+        {categories.length > 0 && (
+          <div style={{ padding: '10px 24px', display: 'flex', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
+            {categories.map(cat => (
+              <div key={cat.slug} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: cat.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'Barlow Condensed', letterSpacing: 0.5 }}>{cat.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {loading
+          ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--text-muted)', fontSize: 13, fontFamily: 'Barlow Condensed', letterSpacing: 1 }}>Cargando...</div>
+          : <CalendarView activities={activities} categories={categories} currentDate={currentDate} />
+        }
+      </main>
+    </>
   )
 }
