@@ -14,8 +14,14 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
     const [y, m, d] = dateStr.split('-').map(Number)
     return new Date(y, m - 1, d)
   }
-  function isSameDay(a: Date, b: Date) {
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  function fmtShort(d: Date) {
+    return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }).replace('.', '')
+  }
+  function fmtRange(start: string, end: string) {
+    const s = parseLocalDate(start); const e = parseLocalDate(end)
+    if (start === end) return `${s.getDate()} ${s.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}`
+    if (s.getMonth() === e.getMonth()) return `${s.getDate()} al ${e.getDate()} de ${e.toLocaleDateString('es-AR', { month: 'long' })}`
+    return `${fmtShort(s)} → ${fmtShort(e)}`
   }
 
   const year = currentDate.getFullYear()
@@ -24,7 +30,6 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
   const lastDay = new Date(year, month + 1, 0)
   let startOffset = firstDay.getDay() - 1
   if (startOffset < 0) startOffset = 6
-
   const totalCells = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7
   const days: (Date | null)[] = []
   for (let i = 0; i < totalCells; i++) {
@@ -34,109 +39,81 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
   const weeks: (Date | null)[][] = []
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7))
 
-  function getWeekActsWithRows(week: (Date | null)[]) {
+  const monthName = currentDate.toLocaleString('es-AR', { month: 'long' })
+  const catOrder = Object.fromEntries(categories.map((c, i) => [c.slug, i]))
+
+  // Group activities by week (based on start_date falling into that week's range)
+  type WeekGroup = { label: string; acts: Activity[] }
+  const weekGroups: WeekGroup[] = []
+  weeks.forEach(week => {
     const validDays = week.filter(Boolean) as Date[]
-    if (!validDays.length) return { acts: [] as Activity[], actRow: {} as Record<string, number>, maxRow: 0 }
+    if (!validDays.length) return
     const weekStart = validDays[0]; const weekEnd = validDays[validDays.length - 1]
-    const weekActs = activities.filter(a => {
+    const acts = activities.filter(a => {
       const s = parseLocalDate(a.start_date); const e = parseLocalDate(a.end_date)
       return s <= weekEnd && e >= weekStart
-    })
-    const catOrder = Object.fromEntries(categories.map((c, i) => [c.slug, i]))
-    weekActs.sort((a, b) => {
+    }).sort((a, b) => {
       if (isViaje(a) && !isViaje(b)) return -1
       if (!isViaje(a) && isViaje(b)) return 1
       const ao = catOrder[a.category_slug] ?? 99; const bo = catOrder[b.category_slug] ?? 99
       if (ao !== bo) return ao - bo
       return parseLocalDate(a.start_date).getTime() - parseLocalDate(b.start_date).getTime()
     })
-    const rows: Activity[][] = []; const actRow: Record<string, number> = {}
-    for (const act of weekActs) {
-      const s = parseLocalDate(act.start_date); const e = parseLocalDate(act.end_date)
-      let placed = false
-      for (let r = 0; r < rows.length; r++) {
-        const conflict = rows[r].some(o => {
-          const os = parseLocalDate(o.start_date); const oe = parseLocalDate(o.end_date)
-          return !(e < os || s > oe)
-        })
-        if (!conflict) { rows[r].push(act); actRow[act.id] = r; placed = true; break }
-      }
-      if (!placed) { rows.push([act]); actRow[act.id] = rows.length - 1 }
+    if (acts.length === 0) return
+    const label = weekStart.getDate() === weekEnd.getDate()
+      ? `${weekStart.getDate()}`
+      : `${weekStart.getDate()} – ${weekEnd.getDate()}`
+    weekGroups.push({ label, acts })
+  })
+
+  // Split weekGroups into 2 columns, balancing total row-weight (headers=1, rows=1)
+  const weight = (g: WeekGroup) => 1 + g.acts.length
+  const totalWeight = weekGroups.reduce((s, g) => s + weight(g), 0)
+  let col1: WeekGroup[] = []; let col2: WeekGroup[] = []
+  let running = 0
+  for (const g of weekGroups) {
+    if (running < totalWeight / 2) { col1.push(g); running += weight(g) }
+    else col2.push(g)
+  }
+  if (col2.length === 0 && col1.length > 1) { col2.push(col1.pop()!) }
+
+  function renderRow(act: Activity): string {
+    const cat = getCat(act)
+    const viaje = isViaje(act); const congreso = isCongreso(act)
+    const dateRange = fmtRange(act.start_date, act.end_date)
+    if (viaje) {
+      return `
+        <div style="flex:1 1 0;min-height:0;display:flex;align-items:center;gap:2.5mm;background:${cat.color};border-radius:1.2mm;padding:0 3mm;margin-bottom:1mm;">
+          <span style="font-size:11pt;">✈</span>
+          <div style="flex:1;min-width:0;overflow:hidden;">
+            <div style="font-size:9.5pt;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Barlow Condensed',Arial;">${act.vendedor || act.name} — ${act.location || ''}</div>
+          </div>
+          <div style="font-size:7.5pt;color:rgba(255,255,255,0.85);font-weight:600;white-space:nowrap;flex-shrink:0;">${dateRange}</div>
+        </div>`
     }
-    return { acts: weekActs, actRow, maxRow: rows.length }
+    const sub = [act.dictante, act.location].filter(Boolean).join('  ·  ')
+    return `
+      <div style="flex:1 1 0;min-height:0;display:flex;align-items:center;gap:2.5mm;background:${cat.color}12;border-left:${congreso ? '1.3mm' : '0.9mm'} solid ${cat.color};border-radius:0.8mm;padding:0 3mm;margin-bottom:1mm;">
+        <div style="flex:1;min-width:0;overflow:hidden;">
+          <div style="font-size:9pt;font-weight:700;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Barlow Condensed',Arial;">${act.name}</div>
+          ${sub ? `<div style="font-size:7pt;color:${cat.color};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sub}</div>` : ''}
+        </div>
+        <div style="font-size:7.5pt;color:#999;font-weight:600;white-space:nowrap;flex-shrink:0;">${dateRange}</div>
+      </div>`
   }
 
-  const monthName = currentDate.toLocaleString('es-AR', { month: 'long' })
-  const DAY_HEADERS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-
-  let weeksHTML = ''
-  weeks.forEach((week, wi) => {
-    const { acts: weekActs, actRow, maxRow } = getWeekActsWithRows(week)
-    const validDays = week.filter(Boolean) as Date[]
-    if (!validDays.length) return
-    const weekStart = validDays[0]; const weekEnd = validDays[validDays.length - 1]
-    const numRows = Math.max(maxRow, 1)
-
-    // Grid template: row1 = day number (7mm), rows 2..n = activity tracks (5.5mm each)
-    const gridTemplateRows = `7mm repeat(${numRows}, 5.5mm)`
-
-    let cellsHTML = ''
-    week.forEach((date, di) => {
-      const isWeekend = date ? (date.getDay() === 0 || date.getDay() === 6) : false
-      const isToday = date ? isSameDay(date, new Date()) : false
-      const borderR = di < 6 ? 'border-right:0.3mm solid #ddd;' : ''
-      cellsHTML += `<div style="grid-column:${di + 1};grid-row:1 / span ${numRows + 1};background:${isWeekend ? '#f9f9f9' : '#fff'};${borderR}z-index:0;"></div>`
-      if (date) {
-        const numStyle = isToday
-          ? 'background:#f15922;color:#fff;font-weight:800;'
-          : isWeekend ? 'color:#bbb;font-weight:600;' : 'color:#444;font-weight:600;'
-        cellsHTML += `<div style="grid-column:${di + 1};grid-row:1;display:flex;align-items:center;justify-content:center;z-index:1;"><span style="${numStyle}font-size:9pt;width:6mm;height:6mm;border-radius:50%;display:flex;align-items:center;justify-content:center;">${date.getDate()}</span></div>`
-      }
+  function renderColumn(groups: WeekGroup[]): string {
+    let html = ''
+    groups.forEach(g => {
+      html += `<div style="flex-shrink:0;font-size:7pt;font-weight:700;color:#aaa;letter-spacing:1pt;text-transform:uppercase;padding:1.5mm 0 1mm;border-bottom:0.3mm solid #eee;margin-bottom:1mm;font-family:'Barlow Condensed',Arial;">Semana del ${g.label}</div>`
+      g.acts.forEach(act => { html += renderRow(act) })
     })
+    return html
+  }
 
-    let barsHTML = ''
-    weekActs.forEach(act => {
-      const cat = getCat(act)
-      const viaje = isViaje(act); const congreso = isCongreso(act)
-      const actStart = parseLocalDate(act.start_date); const actEnd = parseLocalDate(act.end_date)
-      const startsThisWeek = actStart >= weekStart; const endsThisWeek = actEnd <= weekEnd
-
-      let startCol = 0, endCol = 6
-      for (let i = 0; i < 7; i++) {
-        const d = week[i]; if (!d) continue
-        if (isSameDay(d, actStart) || (!startsThisWeek && isSameDay(d, weekStart))) startCol = i
-        if (isSameDay(d, actEnd) || (!endsThisWeek && isSameDay(d, weekEnd))) endCol = i
-      }
-
-      const row = (actRow[act.id] ?? 0) + 2
-      const bg = viaje ? cat.color : congreso ? `${cat.color}30` : `${cat.color}22`
-      const borderTop = `${congreso ? 0.8 : 0.5}mm solid ${cat.color}`
-      const borderBottom = borderTop
-      const borderLeft = startsThisWeek ? `${congreso ? 1.5 : 1}mm solid ${cat.color}` : 'none'
-      const borderRight = endsThisWeek ? `0.5mm solid ${cat.color}` : 'none'
-      const br = startsThisWeek && endsThisWeek ? '1mm' : startsThisWeek ? '1mm 0 0 1mm' : endsThisWeek ? '0 1mm 1mm 0' : '0'
-      const label = viaje
-        ? `✈ ${act.vendedor || act.name}${act.location ? ' — ' + act.location : ''}`
-        : act.name + (act.dictante ? ' · ' + act.dictante : '')
-      const textColor = viaje ? '#fff' : cat.color
-      const fw = viaje ? 800 : congreso ? 700 : 600
-      const fs = viaje ? '8pt' : '7pt'
-      const marginL = startsThisWeek ? '0.5mm' : '0'
-      const marginR = endsThisWeek ? '0.5mm' : '0'
-
-      barsHTML += `
-        <div style="grid-column:${startCol + 1} / ${endCol + 2};grid-row:${row};margin:0 ${marginR} 0 ${marginL};background:${bg};border-top:${borderTop};border-bottom:${borderBottom};border-left:${borderLeft};border-right:${borderRight};border-radius:${br};display:flex;align-items:center;padding-left:1.5mm;overflow:hidden;box-sizing:border-box;z-index:${congreso ? 3 : viaje ? 2 : 1};min-width:0;">
-          <span style="font-size:${fs};font-weight:${fw};color:${textColor};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Barlow Condensed',Arial,sans-serif;letter-spacing:0.2pt;">${label}</span>
-        </div>`
-    })
-
-    const borderB = wi < weeks.length - 1 ? 'border-bottom:0.3mm solid #ddd;' : ''
-    weeksHTML += `
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:${gridTemplateRows};row-gap:0.8mm;padding-bottom:1.5mm;${borderB}">
-        ${cellsHTML}
-        ${barsHTML}
-      </div>`
-  })
+  const legendHTML = categories.map(cat =>
+    `<div style="display:flex;align-items:center;gap:1.5mm;"><div style="width:2.5mm;height:2.5mm;border-radius:0.5mm;background:${cat.color};flex-shrink:0;"></div><span style="font-size:6.5pt;color:#666;font-weight:600;">${cat.name}</span></div>`
+  ).join('')
 
   return `<!DOCTYPE html>
 <html>
@@ -146,19 +123,34 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&family=Barlow+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
-    @page { size: A4 landscape; margin: 8mm 10mm; }
-    body { width:277mm; height:193mm; overflow:hidden; font-family:'Barlow Condensed',Arial,sans-serif; background:#fff; }
+    @page { size: A4 landscape; margin: 10mm 12mm; }
+    body { width:273mm; height:190mm; overflow:hidden; font-family:'Barlow Condensed',Arial,sans-serif; background:#fff; }
     html, body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   </style>
 </head>
 <body>
-  <div style="width:277mm;height:193mm;display:flex;flex-direction:column;">
-    <div style="flex:1;display:flex;flex-direction:column;border:0.3mm solid #ccc;border-radius:1.5mm;overflow:hidden;min-height:0;">
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);background:#f2f2f2;border-bottom:0.3mm solid #ccc;flex-shrink:0;">
-        ${DAY_HEADERS.map((d, i) => `<div style="text-align:center;font-size:7pt;font-weight:700;letter-spacing:0.5pt;text-transform:uppercase;color:${i >= 5 ? '#bbb' : '#777'};padding:2mm 0;border-right:${i < 6 ? '0.3mm solid #ddd' : 'none'};font-family:'Barlow Condensed',Arial;">${d}</div>`).join('')}
+  <div style="width:273mm;height:190mm;display:flex;flex-direction:column;">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4mm;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:4mm;">
+        <div style="width:11mm;height:11mm;background:#f15922;border-radius:2.2mm;display:flex;align-items:center;justify-content:center;">
+          <span style="color:#fff;font-size:6.5pt;font-weight:900;font-family:'Montserrat',Arial;">DM</span>
+        </div>
+        <div>
+          <div style="font-size:7.5pt;color:#f15922;letter-spacing:2pt;text-transform:uppercase;font-weight:700;line-height:1;font-family:'Montserrat',Arial;">Dental Medrano</div>
+          <div style="font-size:22pt;font-weight:800;color:#111;text-transform:capitalize;line-height:1.1;font-family:'Montserrat',Arial;">Cronograma de ${monthName} ${year}</div>
+        </div>
       </div>
-      <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;min-height:0;">
-        ${weeksHTML}
+      <div style="display:flex;gap:5mm;align-items:center;flex-wrap:wrap;justify-content:flex-end;">${legendHTML}</div>
+    </div>
+
+    <!-- Two columns -->
+    <div style="flex:1;display:flex;gap:6mm;min-height:0;">
+      <div style="flex:1;display:flex;flex-direction:column;min-height:0;border:0.3mm solid #eee;border-radius:2mm;padding:0 3mm;">
+        ${renderColumn(col1)}
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;min-height:0;border:0.3mm solid #eee;border-radius:2mm;padding:0 3mm;">
+        ${renderColumn(col2)}
       </div>
     </div>
   </div>
