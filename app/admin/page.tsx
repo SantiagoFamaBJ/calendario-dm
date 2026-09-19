@@ -171,10 +171,12 @@ export default function AdminPage() {
   const catMap = Object.fromEntries(categories.map(c => [c.slug,c]))
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<'fecha' | 'categoria'>('fecha')
+  const [showPast, setShowPast] = useState(false)
 
   const filtered = activities
     .filter(a => filter === 'all' || (a.category_slug||a.type) === filter)
     .filter(a => !search || (a.vendedor||'').toLowerCase().includes(search.toLowerCase()) || (a.name||'').toLowerCase().includes(search.toLowerCase()))
+    .filter(a => showPast || a.end_date >= new Date().toISOString().slice(0, 10))
     .sort((a, b) => {
       if (sortBy === 'fecha') return a.start_date.localeCompare(b.start_date)
       const catOrder = Object.fromEntries(categories.map((c, i) => [c.slug, i]))
@@ -329,6 +331,9 @@ export default function AdminPage() {
                 placeholder="Buscar por vendedor o nombre..."
                 style={{ background:'#fff', border:'1px solid #e0e0e0', borderRadius:8, color:'#111', padding:'7px 12px', fontSize:13, fontFamily:'Barlow, sans-serif', outline:'none', flex:1, minWidth:200 }}
               />
+              <button onClick={() => setShowPast(p => !p)} style={{ background: showPast ? '#111' : '#fff', border:`1px solid ${showPast ? '#111' : '#e0e0e0'}`, color: showPast ? '#fff' : '#aaa', padding:'7px 14px', borderRadius:8, cursor:'pointer', fontSize:11, fontFamily:'Barlow Condensed', letterSpacing:0.5, fontWeight:600, whiteSpace:'nowrap' }}>
+                {showPast ? '✓ Ver pasadas' : 'Ver pasadas'}
+              </button>
               <div style={{ display:'flex', gap:4 }}>
                 {(['fecha','categoria'] as const).map(s => (
                   <button key={s} onClick={() => setSortBy(s)} style={{ background: sortBy===s ? '#111' : '#fff', border:`1px solid ${sortBy===s ? '#111' : '#e0e0e0'}`, color: sortBy===s ? '#fff' : '#888', padding:'7px 12px', borderRadius:8, cursor:'pointer', fontSize:11, fontFamily:'Barlow Condensed', letterSpacing:0.5, fontWeight:600, textTransform:'uppercase' }}>

@@ -159,21 +159,7 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
   </style>
 </head>
 <body>
-  <div style="width:277mm;height:193mm;display:flex;flex-direction:column;">
-    <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4mm;flex-shrink:0;">
-      <div style="display:flex;align-items:center;gap:4mm;">
-        <div style="width:10mm;height:10mm;background:#f15922;border-radius:2mm;display:flex;align-items:center;justify-content:center;">
-          <span style="color:#fff;font-size:6pt;font-weight:900;font-family:'Montserrat',Arial;">DM</span>
-        </div>
-        <div>
-          <div style="font-size:7pt;color:#f15922;letter-spacing:2pt;text-transform:uppercase;font-weight:700;line-height:1;font-family:'Montserrat',Arial;">Dental Medrano</div>
-          <div style="font-size:20pt;font-weight:800;color:#111;text-transform:capitalize;line-height:1.1;font-family:'Montserrat',Arial;">${monthName} ${year}</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:5mm;align-items:center;flex-wrap:wrap;justify-content:flex-end;">${legendHTML}</div>
-    </div>
-
+  <div style="width:277mm;height:193mm;display:flex;flex-direction:column;padding:0;">
     <!-- Grid -->
     <div style="flex:1;display:flex;flex-direction:column;border:0.3mm solid #ccc;border-radius:1.5mm;overflow:hidden;min-height:0;">
       <!-- Day headers -->
