@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { Activity, Category } from '@/lib/supabase'
 
 interface Props {
@@ -27,16 +27,17 @@ function diffDays(start: string, end: string) {
   return Math.round((parseLocalDate(end).getTime() - parseLocalDate(start).getTime()) / 86400000) + 1
 }
 
+const ROW_TRACK = 24 // px height of each activity row
+const ROW_GAP = 3
+
 export default function CalendarView({ activities, categories, currentDate }: Props) {
   const [selected, setSelected] = useState<Activity | null>(null)
   const [tooltip, setTooltip] = useState<{ act: Activity; x: number; y: number } | null>(null)
-  const [mobileDay, setMobileDay] = useState<Date | null>(null)
 
   const catMap = Object.fromEntries(categories.map(c => [c.slug, c]))
   const getCat = (act: Activity) => catMap[act.category_slug] || catMap[act.type] || { color: '#888', name: act.category_slug || act.type, slug: '' }
   const isViaje = (act: Activity) => act.category_slug === 'viaje' || act.type === 'viaje'
   const isCongreso = (act: Activity) => act.category_slug === 'congreso' || act.type === 'congreso'
-  const isCursoDM = (act: Activity) => act.category_slug === 'curso_dm' || act.type === 'curso_dm'
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -55,36 +56,50 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7))
   const today = new Date()
 
-  function getWeekLayout(week: (Date | null)[]) {
+  // Row-packing: assign each activity a row index within its week, avoiding overlap
+  function getWeekActsWithRows(week: (Date | null)[]) {
     const validDays = week.filter(Boolean) as Date[]
-    if (!validDays.length) return {}
-    const weekStart = validDays[0]; const weekEnd = validDays[validDays.length - 1]
+    if (!validDays.length) return { acts: [] as Activity[], actRow: {} as Record<string, number>, maxRow: 0 }
+    const weekStart = validDays[0]
+    const weekEnd = validDays[validDays.length - 1]
+
     const weekActs = activities.filter(a => {
-      const s = parseLocalDate(a.start_date); const e = parseLocalDate(a.end_date)
+      const s = parseLocalDate(a.start_date)
+      const e = parseLocalDate(a.end_date)
       return s <= weekEnd && e >= weekStart
     })
+
     const catOrder = Object.fromEntries(categories.map((c, i) => [c.slug, i]))
     weekActs.sort((a, b) => {
       if (isViaje(a) && !isViaje(b)) return -1
       if (!isViaje(a) && isViaje(b)) return 1
-      const ao = catOrder[a.category_slug] ?? 99; const bo = catOrder[b.category_slug] ?? 99
+      const ao = catOrder[a.category_slug] ?? 99
+      const bo = catOrder[b.category_slug] ?? 99
       if (ao !== bo) return ao - bo
       return parseLocalDate(a.start_date).getTime() - parseLocalDate(b.start_date).getTime()
     })
-    const rows: Activity[][] = []; const actRow: Record<string, number> = {}
+
+    const rows: Activity[][] = []
+    const actRow: Record<string, number> = {}
     for (const act of weekActs) {
-      const s = parseLocalDate(act.start_date); const e = parseLocalDate(act.end_date)
+      const s = parseLocalDate(act.start_date)
+      const e = parseLocalDate(act.end_date)
       let placed = false
       for (let r = 0; r < rows.length; r++) {
-        const conflict = rows[r].some(o => { const os = parseLocalDate(o.start_date); const oe = parseLocalDate(o.end_date); return !(e < os || s > oe) })
+        const conflict = rows[r].some(o => {
+          const os = parseLocalDate(o.start_date)
+          const oe = parseLocalDate(o.end_date)
+          return !(e < os || s > oe)
+        })
         if (!conflict) { rows[r].push(act); actRow[act.id] = r; placed = true; break }
       }
       if (!placed) { rows.push([act]); actRow[act.id] = rows.length - 1 }
     }
-    return actRow
+
+    return { acts: weekActs, actRow, maxRow: rows.length }
   }
 
-  function getActivitiesForDay(date: Date) {
+  function getActivitiesForDay(date: Date): Activity[] {
     const catOrder = Object.fromEntries(categories.map((c, i) => [c.slug, i]))
     return activities
       .filter(a => isInRange(date, parseLocalDate(a.start_date), parseLocalDate(a.end_date)))
@@ -96,29 +111,18 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
   }
 
   const DAY_HEADERS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-  const ROW_H = 26; const ROW_GAP = 3; const DAY_NUM_H = 34; const MIN_H = 120
-
-  // Duplicate activity
-  async function handleDuplicate(act: Activity) {
-    const { supabase } = await import('@/lib/supabase')
-    const { id, created_at, ...rest } = act as Activity & { created_at?: string }
-    await supabase.from('cal_activities').insert({ ...rest, name: rest.name + ' (copia)' })
-    window.location.reload()
-  }
 
   return (
     <>
       <style>{`
-        .cal-bar { transition: filter 0.12s, transform 0.12s; }
-        .cal-bar:hover { filter: brightness(0.88) !important; transform: scaleY(1.06); z-index: 20 !important; }
-        .day-cell:hover { background: #fafafa !important; cursor: pointer; }
+        .cal-bar { transition: filter 0.12s; }
+        .cal-bar:hover { filter: brightness(0.88) !important; z-index: 50 !important; }
         @media (min-width: 768px) { .mobile-list { display: none !important; } }
         @media (max-width: 767px) { .desktop-grid { display: none !important; } .mobile-list { display: block !important; } }
       `}</style>
 
       {/* ── DESKTOP GRID ── */}
       <div className="desktop-grid">
-        {/* Day headers */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#f5f5f5', borderBottom: '1px solid #e8e8e8' }}>
           {DAY_HEADERS.map((d, i) => (
             <div key={d} style={{ textAlign: 'center', fontSize: 11, fontFamily: 'Barlow Condensed', letterSpacing: 1.5, color: i >= 5 ? '#ccc' : '#aaa', padding: '9px 0', fontWeight: 700, textTransform: 'uppercase', borderRight: i < 6 ? '1px solid #e8e8e8' : 'none' }}>{d}</div>
@@ -126,35 +130,67 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
         </div>
 
         {weeks.map((week, wi) => {
-          const actRow = getWeekLayout(week)
+          const { acts: weekActs, actRow, maxRow } = getWeekActsWithRows(week)
           const validDays = week.filter(Boolean) as Date[]
           if (!validDays.length) return null
-          const weekStart = validDays[0]; const weekEnd = validDays[validDays.length - 1]
-          const weekActs = activities.filter(a => { const s = parseLocalDate(a.start_date); const e = parseLocalDate(a.end_date); return s <= weekEnd && e >= weekStart })
-          const numRows = weekActs.length > 0 ? Math.max(...weekActs.map(a => (actRow[a.id] ?? 0) + 1)) : 0
-          const weekH = Math.max(MIN_H, DAY_NUM_H + numRows * (ROW_H + ROW_GAP) + 10)
+          const weekStart = validDays[0]
+          const weekEnd = validDays[validDays.length - 1]
+          const numRows = Math.max(maxRow, 1)
+
+          // Grid template: row 1 = day number (34px), rows 2..n = activity tracks
+          const gridTemplateRows = `34px repeat(${numRows}, ${ROW_TRACK}px)`
 
           return (
-            <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: wi < weeks.length - 1 ? '1px solid #e8e8e8' : 'none', height: weekH, position: 'relative' }}>
+            <div key={wi} style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              gridTemplateRows,
+              borderBottom: wi < weeks.length - 1 ? '1px solid #e8e8e8' : 'none',
+              rowGap: ROW_GAP,
+              paddingBottom: 6,
+            }}>
+              {/* Day backgrounds — span all rows */}
+              {week.map((date, di) => {
+                const isWeekend = date ? (date.getDay() === 0 || date.getDay() === 6) : false
+                return (
+                  <div key={`bg-${di}`} style={{
+                    gridColumn: di + 1,
+                    gridRow: `1 / span ${numRows + 1}`,
+                    background: isWeekend ? '#f9f9f9' : '#fff',
+                    borderRight: di < 6 ? '1px solid #e8e8e8' : 'none',
+                    zIndex: 0,
+                  }} />
+                )
+              })}
+
+              {/* Day numbers */}
               {week.map((date, di) => {
                 const isToday = date ? isSameDay(date, today) : false
                 const isWeekend = date ? (date.getDay() === 0 || date.getDay() === 6) : false
                 return (
-                  <div key={di} className="day-cell" style={{ borderRight: di < 6 ? '1px solid #e8e8e8' : 'none', background: isWeekend ? '#f9f9f9' : '#fff', height: '100%' }}>
+                  <div key={`num-${di}`} style={{ gridColumn: di + 1, gridRow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
                     {date && (
-                      <div style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '4px auto 0', borderRadius: '50%', background: isToday ? '#f15922' : 'transparent', boxShadow: isToday ? '0 2px 8px rgba(241,89,34,0.35)' : 'none', fontSize: 12, fontWeight: isToday ? 800 : 500, color: isToday ? '#fff' : isWeekend ? '#ccc' : '#aaa', fontFamily: 'Montserrat' }}>
-                        {date.getDate()}
-                      </div>
+                      <div style={{
+                        width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        borderRadius: '50%', background: isToday ? '#f15922' : 'transparent',
+                        boxShadow: isToday ? '0 2px 8px rgba(241,89,34,0.35)' : 'none',
+                        fontSize: 12, fontWeight: isToday ? 800 : 500, fontFamily: 'Montserrat',
+                        color: isToday ? '#fff' : isWeekend ? '#ccc' : '#aaa',
+                      }}>{date.getDate()}</div>
                     )}
                   </div>
                 )
               })}
 
+              {/* Activity bars — precise grid placement, zero overflow risk */}
               {weekActs.map(act => {
                 const cat = getCat(act)
-                const viaje = isViaje(act); const congreso = isCongreso(act); const cursoDM = isCursoDM(act)
-                const actStart = parseLocalDate(act.start_date); const actEnd = parseLocalDate(act.end_date)
-                const startsThisWeek = actStart >= weekStart; const endsThisWeek = actEnd <= weekEnd
+                const viaje = isViaje(act)
+                const congreso = isCongreso(act)
+                const actStart = parseLocalDate(act.start_date)
+                const actEnd = parseLocalDate(act.end_date)
+                const startsThisWeek = actStart >= weekStart
+                const endsThisWeek = actEnd <= weekEnd
 
                 let startCol = 0, endCol = 6
                 for (let i = 0; i < 7; i++) {
@@ -163,19 +199,12 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
                   if (isSameDay(d, actEnd) || (!endsThisWeek && isSameDay(d, weekEnd))) endCol = i
                 }
 
-                const row = actRow[act.id] ?? 0
-                const top = DAY_NUM_H + row * (ROW_H + ROW_GAP)
+                const row = (actRow[act.id] ?? 0) + 2 // +2 because row 1 is day numbers
                 const borderW = congreso ? 2.5 : 2
+                const barBg = viaje ? cat.color : `${cat.color}${cat.slug === 'curso_dm' ? '28' : '18'}`
                 const label = viaje
                   ? `✈  ${act.vendedor || act.name}${act.location ? '  —  ' + act.location : ''}`
                   : act.name + (act.dictante ? '  ·  ' + act.dictante : '')
-
-                // Viaje: solid green, no animation
-                const barBg = viaje
-                  ? cat.color
-                  : cursoDM
-                    ? `${cat.color}28`
-                    : `${cat.color}18`
 
                 return (
                   <div
@@ -185,21 +214,25 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
                     onMouseEnter={e => setTooltip({ act, x: e.clientX, y: e.clientY })}
                     onMouseLeave={() => setTooltip(null)}
                     style={{
-                      position: 'absolute', top,
-                      left: `calc(${startCol / 7 * 100}% + ${startsThisWeek ? 3 : 0}px)`,
-                      right: `calc(${(6 - endCol) / 7 * 100}% + ${endsThisWeek ? 3 : 0}px)`,
-                      height: ROW_H,
+                      gridColumn: `${startCol + 1} / ${endCol + 2}`,
+                      gridRow: row,
+                      margin: `0 ${endsThisWeek ? 3 : 0}px 0 ${startsThisWeek ? 3 : 0}px`,
                       background: barBg,
                       borderTop: `${borderW}px solid ${cat.color}`,
                       borderBottom: `${borderW}px solid ${cat.color}`,
                       borderLeft: startsThisWeek ? `${borderW}px solid ${cat.color}` : 'none',
                       borderRight: endsThisWeek ? `${borderW}px solid ${cat.color}` : 'none',
                       borderRadius: startsThisWeek && endsThisWeek ? 6 : startsThisWeek ? '6px 0 0 6px' : endsThisWeek ? '0 6px 6px 0' : 0,
-                      cursor: 'pointer', overflow: 'hidden',
-                      display: 'flex', alignItems: 'center', paddingLeft: 7, paddingRight: 4,
-                      zIndex: congreso ? 12 : viaje ? 11 : 10,
+                      cursor: 'pointer',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      paddingLeft: 7,
+                      paddingRight: 4,
+                      zIndex: congreso ? 3 : viaje ? 2 : 1,
                       boxSizing: 'border-box',
                       boxShadow: congreso ? `0 2px 8px ${cat.color}30` : viaje ? `0 2px 6px ${cat.color}60` : 'none',
+                      minWidth: 0,
                     }}
                   >
                     <span style={{
@@ -208,7 +241,9 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
                       fontWeight: viaje ? 800 : congreso ? 700 : 600,
                       color: viaje ? '#fff' : cat.color,
                       letterSpacing: 0.3,
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                       textShadow: viaje ? '0 1px 3px rgba(0,0,0,0.3)' : 'none',
                     }}>
                       {label}
@@ -255,31 +290,21 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
         })}
       </div>
 
-      {/* Tooltip — desktop only */}
+      {/* Tooltip */}
       {tooltip && (
         <div style={{
           position: 'fixed',
           left: Math.min(tooltip.x + 14, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 260),
           top: tooltip.y - 14,
-          background: '#f0f0f0',
-          color: '#222',
-          borderRadius: 10,
-          padding: '10px 14px',
-          fontSize: 12,
-          fontFamily: 'Barlow',
-          zIndex: 200,
-          pointerEvents: 'none',
-          maxWidth: 250,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
-          border: `1px solid ${getCat(tooltip.act).color}40`,
+          background: '#f0f0f0', color: '#222', borderRadius: 10, padding: '10px 14px', fontSize: 12,
+          fontFamily: 'Barlow', zIndex: 200, pointerEvents: 'none', maxWidth: 250,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: `1px solid ${getCat(tooltip.act).color}40`,
         }}>
           <div style={{ fontWeight: 700, fontFamily: 'Montserrat', fontSize: 13, marginBottom: 5, color: getCat(tooltip.act).color }}>
             {isViaje(tooltip.act) ? '✈ ' : ''}{tooltip.act.name}
           </div>
           <div style={{ color: '#555', fontSize: 11 }}>
-            {tooltip.act.start_date === tooltip.act.end_date
-              ? formatDate(tooltip.act.start_date)
-              : `${formatDate(tooltip.act.start_date)} → ${formatDate(tooltip.act.end_date)}`}
+            {tooltip.act.start_date === tooltip.act.end_date ? formatDate(tooltip.act.start_date) : `${formatDate(tooltip.act.start_date)} → ${formatDate(tooltip.act.end_date)}`}
           </div>
           {tooltip.act.location && <div style={{ color: '#666', fontSize: 11, marginTop: 3 }}>📍 {tooltip.act.location}</div>}
           {tooltip.act.dictante && <div style={{ color: '#666', fontSize: 11, marginTop: 2 }}>👤 {tooltip.act.dictante}</div>}
@@ -289,7 +314,7 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
       {/* Modal */}
       {selected && (() => {
         const cat = getCat(selected)
-        const viaje = isViaje(selected); const congreso = isCongreso(selected)
+        const viaje = isViaje(selected)
         const dias = diffDays(selected.start_date, selected.end_date)
         return (
           <div onClick={() => setSelected(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
@@ -297,16 +322,12 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${cat.color}12`, border: `1px solid ${cat.color}35`, borderRadius: 20, padding: '4px 12px' }}>
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: cat.color }} />
-                  <span style={{ fontSize: 10, fontFamily: 'Barlow Condensed', fontWeight: 700, color: cat.color, letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                    {viaje ? '✈ ' : ''}{cat.name}
-                  </span>
+                  <span style={{ fontSize: 10, fontFamily: 'Barlow Condensed', fontWeight: 700, color: cat.color, letterSpacing: 1.5, textTransform: 'uppercase' }}>{viaje ? '✈ ' : ''}{cat.name}</span>
                 </div>
                 {dias > 1 && <span style={{ fontSize: 11, color: '#bbb', fontFamily: 'Barlow Condensed', letterSpacing: 0.5 }}>{dias} días</span>}
                 {viaje && dias === 1 && <span style={{ fontSize: 11, color: '#bbb', fontFamily: 'Barlow Condensed' }}>Ida y vuelta</span>}
               </div>
-
               <h2 style={{ fontSize: 21, fontWeight: 800, fontFamily: 'Montserrat', color: '#111', marginBottom: 22, lineHeight: 1.2 }}>{selected.name}</h2>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {[
                   { label: 'Fechas', value: selected.start_date === selected.end_date ? formatDate(selected.start_date) : `${formatDate(selected.start_date)} → ${formatDate(selected.end_date)}` },
@@ -320,7 +341,6 @@ export default function CalendarView({ activities, categories, currentDate }: Pr
                   </div>
                 ))}
               </div>
-
               <button onClick={() => setSelected(null)} style={{ position: 'absolute', top: 18, right: 18, background: '#f5f5f5', border: '1px solid #e8e8e8', color: '#aaa', width: 30, height: 30, borderRadius: 8, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
           </div>

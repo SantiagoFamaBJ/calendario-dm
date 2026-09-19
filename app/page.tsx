@@ -10,6 +10,14 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
   const isViaje = (act: Activity) => act.category_slug === 'viaje' || act.type === 'viaje'
   const isCongreso = (act: Activity) => act.category_slug === 'congreso' || act.type === 'congreso'
 
+  function parseLocalDate(dateStr: string) {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+  function isSameDay(a: Date, b: Date) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  }
+
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
   const firstDay = new Date(year, month, 1)
@@ -26,17 +34,9 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
   const weeks: (Date | null)[][] = []
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7))
 
-  function parseLocalDate(dateStr: string) {
-    const [y, m, d] = dateStr.split('-').map(Number)
-    return new Date(y, m - 1, d)
-  }
-  function isSameDay(a: Date, b: Date) {
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-  }
-
-  function getWeekLayout(week: (Date | null)[]) {
+  function getWeekActsWithRows(week: (Date | null)[]) {
     const validDays = week.filter(Boolean) as Date[]
-    if (!validDays.length) return {}
+    if (!validDays.length) return { acts: [] as Activity[], actRow: {} as Record<string, number>, maxRow: 0 }
     const weekStart = validDays[0]; const weekEnd = validDays[validDays.length - 1]
     const weekActs = activities.filter(a => {
       const s = parseLocalDate(a.start_date); const e = parseLocalDate(a.end_date)
@@ -46,7 +46,9 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
     weekActs.sort((a, b) => {
       if (isViaje(a) && !isViaje(b)) return -1
       if (!isViaje(a) && isViaje(b)) return 1
-      return (catOrder[a.category_slug] ?? 99) - (catOrder[b.category_slug] ?? 99)
+      const ao = catOrder[a.category_slug] ?? 99; const bo = catOrder[b.category_slug] ?? 99
+      if (ao !== bo) return ao - bo
+      return parseLocalDate(a.start_date).getTime() - parseLocalDate(b.start_date).getTime()
     })
     const rows: Activity[][] = []; const actRow: Record<string, number> = {}
     for (const act of weekActs) {
@@ -61,36 +63,35 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
       }
       if (!placed) { rows.push([act]); actRow[act.id] = rows.length - 1 }
     }
-    return actRow
+    return { acts: weekActs, actRow, maxRow: rows.length }
   }
 
   const monthName = currentDate.toLocaleString('es-AR', { month: 'long' })
   const DAY_HEADERS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-  const numWeeks = weeks.length
-  // A4 landscape usable: 277mm x 190mm. Each week row height:
-  const weekH = Math.floor(155 / numWeeks) // mm
 
   let weeksHTML = ''
   weeks.forEach((week, wi) => {
-    const actRow = getWeekLayout(week)
+    const { acts: weekActs, actRow, maxRow } = getWeekActsWithRows(week)
     const validDays = week.filter(Boolean) as Date[]
     if (!validDays.length) return
     const weekStart = validDays[0]; const weekEnd = validDays[validDays.length - 1]
-    const weekActs = activities.filter(a => {
-      const s = parseLocalDate(a.start_date); const e = parseLocalDate(a.end_date)
-      return s <= weekEnd && e >= weekStart
-    })
+    const numRows = Math.max(maxRow, 1)
 
-    let dayCellsHTML = ''
+    // Grid template: row1 = day number (7mm), rows 2..n = activity tracks (5.5mm each)
+    const gridTemplateRows = `7mm repeat(${numRows}, 5.5mm)`
+
+    let cellsHTML = ''
     week.forEach((date, di) => {
       const isWeekend = date ? (date.getDay() === 0 || date.getDay() === 6) : false
       const isToday = date ? isSameDay(date, new Date()) : false
-      const bg = isWeekend ? '#f9f9f9' : '#fff'
       const borderR = di < 6 ? 'border-right:0.3mm solid #ddd;' : ''
-      const numStyle = isToday
-        ? 'background:#f15922;color:#fff;border-radius:50%;width:6mm;height:6mm;display:flex;align-items:center;justify-content:center;font-weight:800;'
-        : isWeekend ? 'color:#bbb;font-weight:600;' : 'color:#444;font-weight:600;'
-      dayCellsHTML += `<div style="background:${bg};${borderR}padding:2mm 2mm 0;box-sizing:border-box;height:100%;"><span style="font-size:9pt;${numStyle}">${date ? date.getDate() : ''}</span></div>`
+      cellsHTML += `<div style="grid-column:${di + 1};grid-row:1 / span ${numRows + 1};background:${isWeekend ? '#f9f9f9' : '#fff'};${borderR}z-index:0;"></div>`
+      if (date) {
+        const numStyle = isToday
+          ? 'background:#f15922;color:#fff;font-weight:800;'
+          : isWeekend ? 'color:#bbb;font-weight:600;' : 'color:#444;font-weight:600;'
+        cellsHTML += `<div style="grid-column:${di + 1};grid-row:1;display:flex;align-items:center;justify-content:center;z-index:1;"><span style="${numStyle}font-size:9pt;width:6mm;height:6mm;border-radius:50%;display:flex;align-items:center;justify-content:center;">${date.getDate()}</span></div>`
+      }
     })
 
     let barsHTML = ''
@@ -107,16 +108,10 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
         if (isSameDay(d, actEnd) || (!endsThisWeek && isSameDay(d, weekEnd))) endCol = i
       }
 
-      const row = actRow[act.id] ?? 0
-      const topMm = 8 + row * 6.5
-      const leftPct = (startCol / 7 * 100).toFixed(2)
-      const rightPct = ((6 - endCol) / 7 * 100).toFixed(2)
-      const leftOff = startsThisWeek ? '0.5mm' : '0'
-      const rightOff = endsThisWeek ? '0.5mm' : '0'
-      const barH = '5.5mm'
+      const row = (actRow[act.id] ?? 0) + 2
       const bg = viaje ? cat.color : congreso ? `${cat.color}30` : `${cat.color}22`
       const borderTop = `${congreso ? 0.8 : 0.5}mm solid ${cat.color}`
-      const borderBottom = `${congreso ? 0.8 : 0.5}mm solid ${cat.color}`
+      const borderBottom = borderTop
       const borderLeft = startsThisWeek ? `${congreso ? 1.5 : 1}mm solid ${cat.color}` : 'none'
       const borderRight = endsThisWeek ? `0.5mm solid ${cat.color}` : 'none'
       const br = startsThisWeek && endsThisWeek ? '1mm' : startsThisWeek ? '1mm 0 0 1mm' : endsThisWeek ? '0 1mm 1mm 0' : '0'
@@ -126,24 +121,22 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
       const textColor = viaje ? '#fff' : cat.color
       const fw = viaje ? 800 : congreso ? 700 : 600
       const fs = viaje ? '8pt' : '7pt'
+      const marginL = startsThisWeek ? '0.5mm' : '0'
+      const marginR = endsThisWeek ? '0.5mm' : '0'
 
       barsHTML += `
-        <div style="position:absolute;top:${topMm}mm;left:calc(${leftPct}% + ${leftOff});right:calc(${rightPct}% + ${rightOff});height:${barH};background:${bg};border-top:${borderTop};border-bottom:${borderBottom};border-left:${borderLeft};border-right:${borderRight};border-radius:${br};display:flex;align-items:center;padding-left:1.5mm;overflow:hidden;box-sizing:border-box;z-index:${viaje ? 11 : congreso ? 12 : 10};">
+        <div style="grid-column:${startCol + 1} / ${endCol + 2};grid-row:${row};margin:0 ${marginR} 0 ${marginL};background:${bg};border-top:${borderTop};border-bottom:${borderBottom};border-left:${borderLeft};border-right:${borderRight};border-radius:${br};display:flex;align-items:center;padding-left:1.5mm;overflow:hidden;box-sizing:border-box;z-index:${congreso ? 3 : viaje ? 2 : 1};min-width:0;">
           <span style="font-size:${fs};font-weight:${fw};color:${textColor};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Barlow Condensed',Arial,sans-serif;letter-spacing:0.2pt;">${label}</span>
         </div>`
     })
 
     const borderB = wi < weeks.length - 1 ? 'border-bottom:0.3mm solid #ddd;' : ''
     weeksHTML += `
-      <div style="flex:1;display:grid;grid-template-columns:repeat(7,1fr);${borderB}position:relative;min-height:0;overflow:hidden;">
-        ${dayCellsHTML}
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:${gridTemplateRows};row-gap:0.8mm;padding-bottom:1.5mm;${borderB}">
+        ${cellsHTML}
         ${barsHTML}
       </div>`
   })
-
-  const legendHTML = categories.map(cat =>
-    `<div style="display:flex;align-items:center;gap:2mm;"><div style="width:3mm;height:3mm;border-radius:0.5mm;background:${cat.color};flex-shrink:0;"></div><span style="font-size:7pt;color:#444;font-weight:600;">${cat.name}</span></div>`
-  ).join('')
 
   return `<!DOCTYPE html>
 <html>
@@ -159,15 +152,12 @@ function generatePrintHTML(activities: Activity[], categories: Category[], curre
   </style>
 </head>
 <body>
-  <div style="width:277mm;height:193mm;display:flex;flex-direction:column;padding:0;">
-    <!-- Grid -->
+  <div style="width:277mm;height:193mm;display:flex;flex-direction:column;">
     <div style="flex:1;display:flex;flex-direction:column;border:0.3mm solid #ccc;border-radius:1.5mm;overflow:hidden;min-height:0;">
-      <!-- Day headers -->
       <div style="display:grid;grid-template-columns:repeat(7,1fr);background:#f2f2f2;border-bottom:0.3mm solid #ccc;flex-shrink:0;">
         ${DAY_HEADERS.map((d, i) => `<div style="text-align:center;font-size:7pt;font-weight:700;letter-spacing:0.5pt;text-transform:uppercase;color:${i >= 5 ? '#bbb' : '#777'};padding:2mm 0;border-right:${i < 6 ? '0.3mm solid #ddd' : 'none'};font-family:'Barlow Condensed',Arial;">${d}</div>`).join('')}
       </div>
-      <!-- Weeks -->
-      <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;min-height:0;">
         ${weeksHTML}
       </div>
     </div>
