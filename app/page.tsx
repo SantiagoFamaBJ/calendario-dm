@@ -23,35 +23,46 @@ export default function Home() {
     setLoading(false)
   }
 
-  function handlePrint() {
-    window.print()
-  }
-
   const monthName = currentDate.toLocaleString('es-AR', { month: 'long' })
   const year = currentDate.getFullYear()
 
   return (
     <>
-      {/* Print CSS */}
       <style>{`
         @media print {
-          @page { size: A4 landscape; margin: 10mm; }
-          body * { visibility: hidden; }
-          #print-area, #print-area * { visibility: visible; }
-          #print-area { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+          @page {
+            size: A4 landscape;
+            margin: 0;
+          }
+          html, body {
+            width: 297mm;
+            height: 210mm;
+            overflow: hidden;
+          }
+          #screen-view { display: none !important; }
+          #print-view {
+            display: flex !important;
+            position: fixed;
+            inset: 0;
+            width: 297mm;
+            height: 210mm;
+            align-items: center;
+            justify-content: center;
+            background: white;
+          }
         }
         @media screen {
-          #print-area { display: none; }
+          #print-view { display: none !important; }
         }
       `}</style>
 
-      {/* Hidden print area */}
-      <div id="print-area">
+      {/* Print view — hidden on screen */}
+      <div id="print-view">
         <PrintView activities={activities} categories={categories} currentDate={currentDate} />
       </div>
 
-      {/* Normal screen view */}
-      <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: 60 }}>
+      {/* Screen view */}
+      <main id="screen-view" style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: 60 }}>
         <header style={{ borderBottom: '1px solid var(--border)', padding: '0 24px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(12px)', zIndex: 50 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 34, height: 34, background: 'var(--orange)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -66,11 +77,9 @@ export default function Home() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Print button */}
             <button
-              onClick={handlePrint}
-              title="Imprimir en A4"
-              style={{ background: '#f5f5f5', border: '1px solid #e0e0e0', color: '#666', height: 34, padding: '0 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontFamily: 'Barlow Condensed', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6 }}
+              onClick={() => window.print()}
+              style={{ background: '#f5f5f5', border: '1px solid #e0e0e0', color: '#555', height: 34, padding: '0 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontFamily: 'Barlow Condensed', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6 }}
             >
               🖨 Imprimir
             </button>

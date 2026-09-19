@@ -41,7 +41,8 @@ export default function PrintView({ activities, categories, currentDate }: Props
   function getWeekLayout(week: (Date | null)[]) {
     const validDays = week.filter(Boolean) as Date[]
     if (!validDays.length) return {}
-    const weekStart = validDays[0]; const weekEnd = validDays[validDays.length - 1]
+    const weekStart = validDays[0]
+    const weekEnd = validDays[validDays.length - 1]
     const weekActs = activities.filter(a => {
       const s = parseLocalDate(a.start_date); const e = parseLocalDate(a.end_date)
       return s <= weekEnd && e >= weekStart
@@ -52,7 +53,8 @@ export default function PrintView({ activities, categories, currentDate }: Props
       if (!isViaje(a) && isViaje(b)) return 1
       return (catOrder[a.category_slug] ?? 99) - (catOrder[b.category_slug] ?? 99)
     })
-    const rows: Activity[][] = []; const actRow: Record<string, number> = {}
+    const rows: Activity[][] = []
+    const actRow: Record<string, number> = {}
     for (const act of weekActs) {
       const s = parseLocalDate(act.start_date); const e = parseLocalDate(act.end_date)
       let placed = false
@@ -69,74 +71,88 @@ export default function PrintView({ activities, categories, currentDate }: Props
   }
 
   const monthName = currentDate.toLocaleString('es-AR', { month: 'long' })
-  const DAY_HEADERS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+  const DAY_HEADERS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM']
+  const numWeeks = weeks.length
+  // Each week gets equal share of available height
+  const weekHeightPx = Math.floor(480 / numWeeks)
+  const ROW_H = 18
+  const DAY_NUM_H = 22
 
   return (
-    <div id="print-view" style={{
-      width: '277mm',
-      height: '190mm',
-      padding: '0',
+    <div style={{
+      width: 1050,
+      height: 680,
+      padding: '16px 20px',
       boxSizing: 'border-box',
       display: 'flex',
       flexDirection: 'column',
-      fontFamily: "'Barlow Condensed', 'Montserrat', sans-serif",
+      fontFamily: "'Barlow Condensed', 'Montserrat', Arial, sans-serif",
       background: '#fff',
       overflow: 'hidden',
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3mm', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '3mm' }}>
-          <div style={{ width: '7mm', height: '7mm', background: '#f15922', borderRadius: '1.5mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: '#fff', fontSize: '4.5pt', fontWeight: 900, fontFamily: 'Montserrat' }}>DM</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 28, height: 28, background: '#f15922', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: '#fff', fontSize: 11, fontWeight: 900, fontFamily: 'Montserrat, Arial' }}>DM</span>
           </div>
           <div>
-            <div style={{ fontSize: '5.5pt', color: '#f15922', letterSpacing: '1pt', textTransform: 'uppercase', fontWeight: 700, lineHeight: 1 }}>Dental Medrano</div>
-            <div style={{ fontSize: '13pt', fontWeight: 800, color: '#111', textTransform: 'capitalize', lineHeight: 1.1, fontFamily: 'Montserrat' }}>
+            <div style={{ fontSize: 9, color: '#f15922', letterSpacing: 2, textTransform: 'uppercase', fontWeight: 700, lineHeight: 1 }}>Dental Medrano</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#111', textTransform: 'capitalize', lineHeight: 1.1, fontFamily: 'Montserrat, Arial' }}>
               Calendario {monthName} {year}
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '5mm', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {categories.map(cat => (
-            <div key={cat.slug} style={{ display: 'flex', alignItems: 'center', gap: '1.5mm' }}>
-              <div style={{ width: '2.5mm', height: '2.5mm', borderRadius: '0.5mm', background: cat.color }} />
-              <span style={{ fontSize: '5.5pt', color: '#444', fontWeight: 600 }}>{cat.name}</span>
+            <div key={cat.slug} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 9, height: 9, borderRadius: 2, background: cat.color }} />
+              <span style={{ fontSize: 10, color: '#444', fontWeight: 600 }}>{cat.name}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Grid */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', border: '0.25mm solid #ccc', borderRadius: '1mm', overflow: 'hidden', minHeight: 0 }}>
+      {/* Grid container */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', border: '1px solid #ddd', borderRadius: 4, overflow: 'hidden', minHeight: 0 }}>
         {/* Day headers */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#f2f2f2', borderBottom: '0.25mm solid #ccc', flexShrink: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#f2f2f2', borderBottom: '1px solid #ddd', flexShrink: 0 }}>
           {DAY_HEADERS.map((d, i) => (
-            <div key={d} style={{ textAlign: 'center', fontSize: '5.5pt', fontWeight: 700, letterSpacing: '0.3pt', textTransform: 'uppercase', color: i >= 5 ? '#bbb' : '#777', padding: '1.5mm 0', borderRight: i < 6 ? '0.25mm solid #ccc' : 'none' }}>{d}</div>
+            <div key={d} style={{ textAlign: 'center', fontSize: 9, fontWeight: 700, letterSpacing: 1, color: i >= 5 ? '#bbb' : '#777', padding: '5px 0', borderRight: i < 6 ? '1px solid #ddd' : 'none' }}>{d}</div>
           ))}
         </div>
 
-        {/* Weeks */}
+        {/* Weeks — each is a fixed pixel height */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           {weeks.map((week, wi) => {
             const actRow = getWeekLayout(week)
             const validDays = week.filter(Boolean) as Date[]
             if (!validDays.length) return null
-            const weekStart = validDays[0]; const weekEnd = validDays[validDays.length - 1]
+            const weekStart = validDays[0]
+            const weekEnd = validDays[validDays.length - 1]
             const weekActs = activities.filter(a => {
               const s = parseLocalDate(a.start_date); const e = parseLocalDate(a.end_date)
               return s <= weekEnd && e >= weekStart
             })
 
             return (
-              <div key={wi} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: wi < weeks.length - 1 ? '0.25mm solid #ccc' : 'none', position: 'relative', minHeight: 0 }}>
+              <div key={wi} style={{
+                flex: 1,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(7, 1fr)',
+                borderBottom: wi < weeks.length - 1 ? '1px solid #ddd' : 'none',
+                position: 'relative',
+                minHeight: 0,
+                overflow: 'hidden',
+              }}>
                 {week.map((date, di) => {
                   const isWeekend = date ? (date.getDay() === 0 || date.getDay() === 6) : false
                   const isToday = date ? isSameDay(date, new Date()) : false
                   return (
-                    <div key={di} style={{ borderRight: di < 6 ? '0.25mm solid #ccc' : 'none', background: isWeekend ? '#f9f9f9' : '#fff', padding: '1mm 1.5mm 0', boxSizing: 'border-box', height: '100%' }}>
+                    <div key={di} style={{ borderRight: di < 6 ? '1px solid #ddd' : 'none', background: isWeekend ? '#fafafa' : '#fff', padding: '4px 4px 0', boxSizing: 'border-box', height: '100%' }}>
                       {date && (
-                        <div style={{ width: '4.5mm', height: '4.5mm', borderRadius: '50%', background: isToday ? '#f15922' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <span style={{ fontSize: '6.5pt', fontWeight: isToday ? 800 : 600, color: isToday ? '#fff' : isWeekend ? '#bbb' : '#444', fontFamily: 'Montserrat' }}>{date.getDate()}</span>
+                        <div style={{ width: 18, height: 18, borderRadius: '50%', background: isToday ? '#f15922' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ fontSize: 10, fontWeight: isToday ? 800 : 600, color: isToday ? '#fff' : isWeekend ? '#bbb' : '#555', fontFamily: 'Montserrat, Arial' }}>{date.getDate()}</span>
                         </div>
                       )}
                     </div>
@@ -146,8 +162,10 @@ export default function PrintView({ activities, categories, currentDate }: Props
                 {weekActs.map(act => {
                   const cat = getCat(act)
                   const viaje = isViaje(act); const congreso = isCongreso(act)
-                  const actStart = parseLocalDate(act.start_date); const actEnd = parseLocalDate(act.end_date)
-                  const startsThisWeek = actStart >= weekStart; const endsThisWeek = actEnd <= weekEnd
+                  const actStart = parseLocalDate(act.start_date)
+                  const actEnd = parseLocalDate(act.end_date)
+                  const startsThisWeek = actStart >= weekStart
+                  const endsThisWeek = actEnd <= weekEnd
 
                   let startCol = 0, endCol = 6
                   for (let i = 0; i < 7; i++) {
@@ -157,32 +175,36 @@ export default function PrintView({ activities, categories, currentDate }: Props
                   }
 
                   const row = actRow[act.id] ?? 0
-                  const topMm = 5.5 + row * 5
+                  const top = DAY_NUM_H + row * (ROW_H + 2)
 
                   const label = viaje
                     ? `✈ ${act.vendedor || act.name}${act.location ? ' — ' + act.location : ''}`
                     : act.name + (act.dictante ? ' · ' + act.dictante : '')
 
-                  const showLabel = startsThisWeek || isSameDay(weekStart, week.find(d => d !== null)!)
-
                   return (
                     <div key={act.id} style={{
                       position: 'absolute',
-                      top: `${topMm}mm`,
-                      left: `calc(${startCol / 7 * 100}% + ${startsThisWeek ? '0.4mm' : '0mm'})`,
-                      right: `calc(${(6 - endCol) / 7 * 100}% + ${endsThisWeek ? '0.4mm' : '0mm'})`,
-                      height: '4mm',
-                      background: viaje ? cat.color : `${cat.color}25`,
-                      border: `${congreso ? '0.5mm' : '0.3mm'} solid ${cat.color}`,
-                      borderLeft: startsThisWeek ? `${congreso ? '0.8mm' : '0.5mm'} solid ${cat.color}` : 'none',
-                      borderRight: endsThisWeek ? '0.3mm solid ' + cat.color : 'none',
-                      borderRadius: startsThisWeek && endsThisWeek ? '0.7mm' : startsThisWeek ? '0.7mm 0 0 0.7mm' : endsThisWeek ? '0 0.7mm 0.7mm 0' : 0,
-                      display: 'flex', alignItems: 'center', paddingLeft: '1mm',
+                      top,
+                      left: `calc(${startCol / 7 * 100}% + ${startsThisWeek ? 2 : 0}px)`,
+                      right: `calc(${(6 - endCol) / 7 * 100}% + ${endsThisWeek ? 2 : 0}px)`,
+                      height: ROW_H,
+                      background: viaje ? cat.color : congreso ? `${cat.color}30` : `${cat.color}22`,
+                      border: `${congreso ? 1.5 : 1}px solid ${cat.color}`,
+                      borderLeft: startsThisWeek ? `${congreso ? 3 : 2}px solid ${cat.color}` : 'none',
+                      borderRight: endsThisWeek ? `1px solid ${cat.color}` : 'none',
+                      borderRadius: startsThisWeek && endsThisWeek ? 3 : startsThisWeek ? '3px 0 0 3px' : endsThisWeek ? '0 3px 3px 0' : 0,
+                      display: 'flex', alignItems: 'center', paddingLeft: 5,
                       overflow: 'hidden', boxSizing: 'border-box',
                       zIndex: viaje ? 11 : congreso ? 12 : 10,
                     }}>
-                      {showLabel && (
-                        <span style={{ fontSize: viaje ? '5.5pt' : '5pt', fontWeight: viaje ? 800 : congreso ? 700 : 600, color: viaje ? '#fff' : cat.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '0.1pt' }}>
+                      {(startsThisWeek || isSameDay(weekStart, validDays[0])) && (
+                        <span style={{
+                          fontSize: viaje ? 10 : 9,
+                          fontWeight: viaje ? 800 : congreso ? 700 : 600,
+                          color: viaje ? '#fff' : cat.color,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                          letterSpacing: 0.2,
+                        }}>
                           {label}
                         </span>
                       )}
