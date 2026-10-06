@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase, Activity, Category, DEFAULT_COLORS } from '@/lib/supabase'
 
 const ADMIN_KEY = 'cal_dm_admin_auth'
-const ADMIN_PASS = 'DM2026'
 const EMPTY_FORM = { category_slug: '', name: '', start_date: '', end_date: '', location: '', vendedor: '', dictante: '' }
 
 const MONTH_MAP: Record<string, number> = { ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SEP:9,OCT:10,NOV:11,DIC:12 }
@@ -104,8 +103,9 @@ export default function AdminPage() {
     setLoading(false)
   }
 
-  function handleLogin() {
-    if (pass === ADMIN_PASS) { localStorage.setItem(ADMIN_KEY,'true'); setAuthed(true) }
+  async function handleLogin() {
+    const res = await fetch('/api/admin-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass }) })
+    if (res.ok) { localStorage.setItem(ADMIN_KEY,'true'); setAuthed(true) }
     else { setPassError(true); setTimeout(() => setPassError(false), 2000) }
   }
   function handleLogout() { localStorage.removeItem(ADMIN_KEY); setAuthed(false) }
