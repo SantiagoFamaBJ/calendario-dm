@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { supabase, Activity, Category, DEFAULT_COLORS } from '@/lib/supabase'
+import { Activity, Category, DEFAULT_COLORS } from '@/lib/supabase'
+import { supabaseAdmin as supabase, cerrarSesionAdmin } from '@/lib/supabaseAdmin'
 
-const ADMIN_KEY = 'cal_dm_admin_auth'
+const ADMIN_KEY = 'cal_dm_admin_auth_v2'
 const EMPTY_FORM = { category_slug: '', name: '', start_date: '', end_date: '', location: '', vendedor: '', dictante: '' }
 
 const MONTH_MAP: Record<string, number> = { ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SEP:9,OCT:10,NOV:11,DIC:12 }
@@ -108,7 +109,7 @@ export default function AdminPage() {
     if (res.ok) { localStorage.setItem(ADMIN_KEY,'true'); setAuthed(true) }
     else { setPassError(true); setTimeout(() => setPassError(false), 2000) }
   }
-  function handleLogout() { localStorage.removeItem(ADMIN_KEY); setAuthed(false) }
+  function handleLogout() { localStorage.removeItem(ADMIN_KEY); setAuthed(false); cerrarSesionAdmin() }
 
   function startEdit(act: Activity) {
     setForm({ category_slug: act.category_slug||act.type, name: act.name, start_date: act.start_date, end_date: act.end_date, location: act.location, vendedor: act.vendedor, dictante: act.dictante||'' })
